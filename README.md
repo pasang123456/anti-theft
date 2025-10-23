@@ -46,7 +46,17 @@ There is no instant alert to family or friends when theft or tampering first occ
 | 🧰 **Configurable via .env** | Store all credentials securely in environment variables. |
 
 ---
-hello world
+💡 Possible Future Upgrades
+
+GPS tracking & map visualization
+
+AI detection of suspicious motion or faces
+
+Multi-device dashboard (family network)
+
+Integration with Apple/Google “Find My” APIs
+
+Support for wearables (smartwatch alert button)
 ## 🏗️ System Architecture
 
 ```text
