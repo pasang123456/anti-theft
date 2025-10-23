@@ -1,0 +1,272 @@
+<!--
+Anti-Theft Alert — Web Landing + Prototype
+File: anti-theft-prototype.html
+
+What's included:
+- A single-page web frontend (HTML/CSS/JS) that acts as a dashboard and prototype for the app.
+- A simulated "Trigger Alert" button that calls a demo server endpoint (/api/alert).
+- Embedded example server code (Node/Express) and notes showing how to send push notifications using FCM and SMS using Twilio (placeholders only).
+- Mobile integration notes (Android/iOS) and security/privacy limitations.
+
+How to use:
+1. Save this file as anti-theft-prototype.html and open it in a browser to see the UI and prototype behavior.
+2. The frontend expects a server endpoint at POST /api/alert that accepts JSON {phone, message, contacts: [...]} — example server code is below in the comments.
+3. For real alerts you'll need a native mobile app (Android or iOS) with on-device sensors, and push notification support (FCM / APNs). See the "Mobile Integration & Limitations" section below.
+
+Important privacy & safety notes:
+- This prototype is ONLY a demonstration frontend + server example. Real theft detection (PIN attempt detection, device lock bypass attempts) requires a native app with platform permissions; a website alone cannot detect phone PIN attempts or access lockscreen events.
+- Do NOT deploy API keys into client-side code. Use server-side secrets for FCM / Twilio / SMTP.
+- Respect legal and privacy rules when alerting people or capturing device information.
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Anti-Theft Alert — Prototype</title>
+  <style>
+    :root{--bg:#0f1723;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--glass: rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,#071026 0%, #071a2a 100%);color:#e6eef6;display:flex;align-items:center;justify-content:center;padding:32px}
+    .container{width:100%;max-width:1100px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    .brand{display:flex;flex-direction:column}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:1fr 420px;gap:18px}
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(2,6,23,.6)}
+
+    .form-row{display:flex;gap:8px;margin-bottom:10px}
+    input,textarea,select,button{background:var(--glass);border:1px solid rgba(255,255,255,0.04);color:inherit;padding:10px;border-radius:8px}
+    input::placeholder{color:#6b7280}
+    button{cursor:pointer}
+
+    .contacts{margin-top:8px}
+    .contact{display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);margin-bottom:8px}
+    .small{font-size:12px;color:var(--muted)}
+
+    .alert-preview{background:linear-gradient(90deg, rgba(255,0,90,0.06), rgba(6,182,212,0.04));padding:12px;border-radius:8px}
+
+    footer{margin-top:14px;color:var(--muted);font-size:12px}
+
+    @media(max-width:920px){.grid{grid-template-columns:1fr;}.card{padding:14px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div style="width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#7c3aed)"></div>
+      <div class="brand">
+        <h1>Anti-Theft Alert — Prototype</h1>
+        <p class="lead">Web dashboard + prototype UI for an app that alerts trusted contacts when a phone is stolen or subjected to suspicious unlock attempts.</p>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left column: Setup & simulate -->
+      <div class="card">
+        <h2 style="margin-top:0">Setup</h2>
+        <div class="small">Register device</div>
+        <div class="form-row" style="margin-top:8px">
+          <input id="deviceName" placeholder="Device name (e.g. John's Pixel)" />
+          <input id="devicePhone" placeholder="Device phone number (+123...)" />
+        </div>
+
+        <div style="margin-top:10px">
+          <div class="small">Trusted contacts</div>
+          <div id="contactsList" class="contacts"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input id="contactName" placeholder="Name" />
+            <input id="contactPhone" placeholder="Phone +E.164" />
+            <button id="addContactBtn">Add</button>
+          </div>
+        </div>
+
+        <hr style="margin:14px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)" />
+
+        <h3>Simulate events</h3>
+        <div class="small">This demo simulates alerts — a real app requires a native component to detect PIN attempts or presence-of-tampering.</div>
+
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <select id="reasonSelect">
+            <option value="theft">Device stolen</option>
+            <option value="pin_attempt">Multiple PIN attempts</option>
+            <option value="tamper">Tamper / SIM changed</option>
+          </select>
+          <button id="triggerBtn">Trigger Alert</button>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="small">Alert preview</div>
+          <div id="alertPreview" class="alert-preview">No alerts sent yet.</div>
+        </div>
+
+        <footer>
+          <div>Prototype only — mobile detection and reliable delivery require native apps and server-side push/SMS.</div>
+        </footer>
+      </div>
+
+      <!-- Right column: Logs / instructions -->
+      <div class="card">
+        <h2 style="margin-top:0">Logs & Demo server</h2>
+        <div class="small">Local simulation log</div>
+        <pre id="log" style="height:360px;overflow:auto;background:transparent;border-radius:8px;padding:8px;margin-top:8px">Ready.
+
+Note: This frontend will send a POST to /api/alert — add a server (see embedded example) to actually dispatch notifications (FCM/APNs) and SMS (Twilio).</pre>
+
+        <h3 style="margin-top:12px">How it works (overview)</h3>
+        <ul style="padding-left:18px;color:var(--muted)">
+          <li>Native app on device detects suspicious events (PIN failures, SIM change, rapid location changes).</li>
+          <li>Device calls your server API with event details.</li>
+          <li>Server dispatches push notifications (FCM for Android / APNs for iOS) to trusted contacts OR sends SMS/emails as fallback.</li>
+        </ul>
+
+        <h3 style="margin-top:8px">Developer notes</h3>
+        <div class="small">Server & mobile code snippets are embedded below this file in comments. Replace keys with environment variables and secure them on the server — never put API keys in client JS.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Simple in-page state (demo only)
+    const contacts = [];
+    const contactsList = document.getElementById('contactsList');
+    const logEl = document.getElementById('log');
+    const alertPreview = document.getElementById('alertPreview');
+
+    function renderContacts(){
+      contactsList.innerHTML = '';
+      contacts.forEach((c, i)=>{
+        const div = document.createElement('div');
+        div.className = 'contact';
+        div.innerHTML = `<div><strong>${escapeHtml(c.name)}</strong><div class='small'>${escapeHtml(c.phone)}</div></div><div><button data-i='${i}'>Remove</button></div>`;
+        contactsList.appendChild(div);
+      });
+      contactsList.querySelectorAll('button').forEach(b=>b.addEventListener('click', e=>{
+        const i = Number(e.target.dataset.i); contacts.splice(i,1); renderContacts();
+      }));
+    }
+
+    document.getElementById('addContactBtn').addEventListener('click', ()=>{
+      const name = document.getElementById('contactName').value.trim();
+      const phone = document.getElementById('contactPhone').value.trim();
+      if(!name || !phone){ alert('Please add name and phone'); return; }
+      contacts.push({name,phone});
+      document.getElementById('contactName').value=''; document.getElementById('contactPhone').value='';
+      renderContacts();
+    });
+
+    document.getElementById('triggerBtn').addEventListener('click', async ()=>{
+      const deviceName = document.getElementById('deviceName').value.trim() || 'Unknown device';
+      const devicePhone = document.getElementById('devicePhone').value.trim() || 'Unknown phone';
+      const reason = document.getElementById('reasonSelect').value;
+      const payload = {
+        deviceName, devicePhone, reason, contacts
+      };
+
+      const message = buildMessage(payload);
+      alertPreview.textContent = message;
+      appendLog(`Simulated event -> ${message}`);
+
+      // Demo: POST to /api/alert (server must implement). For demo purposes we won't really send to third-parties.
+      try{
+        const res = await fetch('/api/alert', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        if(res.ok){ appendLog('Server responded: OK'); }
+        else{ appendLog('Server responded: ' + res.status); }
+      }catch(err){ appendLog('No server at /api/alert (this is expected in demo).'); }
+    });
+
+    function buildMessage({deviceName,devicePhone,reason}){
+      if(reason==='theft') return `${deviceName} (${devicePhone}) may have been stolen.`;
+      if(reason==='pin_attempt') return `${deviceName} experienced multiple failed PIN attempts.`;
+      return `${deviceName} reported tampering or SIM change.`;
+    }
+
+    function appendLog(s){ logEl.textContent = (new Date()).toLocaleString() + ' — ' + s + '\n' + logEl.textContent; }
+    function escapeHtml(str){ return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[m]); }
+  </script>
+
+  <!--
+  ----------------------
+  Example server (Node.js + Express) — save as server.js
+  ----------------------
+
+  // npm install express body-parser node-fetch firebase-admin twilio
+
+  const express = require('express');
+  const bodyParser = require('body-parser');
+  // const admin = require('firebase-admin'); // for FCM
+  // const twilio = require('twilio'); // for SMS fallback
+
+  const app = express();
+  app.use(bodyParser.json());
+
+  // Initialize Firebase Admin SDK (server only), use service account JSON via env var
+  // admin.initializeApp({ credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+
+  // Twilio example setup (from env)
+  // const twClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+
+  app.post('/api/alert', async (req, res) => {
+    const {deviceName, devicePhone, reason, contacts} = req.body;
+    if(!contacts || !Array.isArray(contacts)) return res.status(400).send('no contacts');
+
+    const message = (()=>{
+      if(reason==='theft') return `${deviceName} may have been stolen. Last known phone ${devicePhone}.`;
+      if(reason==='pin_attempt') return `${deviceName} had multiple failed PIN attempts.`;
+      return `${deviceName} reports tampering.`;
+    })();
+
+    // Example: send push to each contact via FCM (requires registration tokens for each contact's app instance)
+    // Here we just log; implement real push using admin.messaging().sendToDevice(token, payload)
+
+    console.log('Alert message:', message);
+    for(const c of contacts){
+      console.log('Would notify', c.name, c.phone);
+      // Send SMS fallback (example) -- uncomment after configuring Twilio
+      // await twClient.messages.create({from: process.env.TWILIO_FROM, to: c.phone, body: message});
+    }
+
+    res.json({status:'queued', recipients: contacts.length});
+  });
+
+  app.listen(3000, ()=>console.log('Server listening on :3000'));
+
+  ----------------------
+  Mobile Integration & Limitations
+  ----------------------
+
+  1) Why a native app is required
+     - Only a native mobile app (with platform permissions) can detect lockscreen events, repeated PIN failures, SIM changes, sensor changes, or sudden movement.
+     - Websites cannot access device lock state or PIN attempts.
+
+  2) Android notes
+     - Use a foreground/background service with appropriate permissions. For some low-level events, Device Admin / Device Owner features were historically required, but these are sensitive and restricted.
+     - Use Firebase Cloud Messaging (FCM) to send push notifications to trusted contacts' devices.
+     - For detecting wrong PIN attempts, Android does not expose exact PIN attempts to third-party apps, and trying to hook into lockscreen may be blocked by OS.
+
+  3) iOS notes
+     - iOS is much more restrictive; you generally cannot detect PIN attempts or lockscreen events. You can detect SIM changes via telephony APIs only in limited ways and background execution is limited.
+     - Push via APNs is required for notifications.
+
+  4) Recommended architecture
+     - Native mobile app (Android/iOS) on the protected device that detects events and calls your server with authenticated requests.
+     - Server that validates device identity and dispatches notifications via FCM/APNs and SMS/email fallbacks.
+     - Trusted contacts are registered with their push tokens or phone numbers.
+
+  5) Security & privacy
+     - Use strong authentication (OAuth or API keys) for device -> server calls; rotate keys.
+     - Store contact data and tokens encrypted at rest.
+     - Follow GDPR / local law for notifying people about tracked events; get consent from users and contacts.
+
+  6) Quick next steps for you
+     - If you want, I can:
+        * Turn this into a multi-file repo with server and mobile stubs.
+        * Create Android sample code (Kotlin) that simulates a PIN-failure event and calls the server.
+        * Provide production checklist for push notifications and legal compliance.
+
+  -->
+</body>
+</html>
