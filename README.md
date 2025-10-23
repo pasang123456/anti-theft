@@ -46,7 +46,7 @@ There is no instant alert to family or friends when theft or tampering first occ
 | 🧰 **Configurable via .env** | Store all credentials securely in environment variables. |
 
 ---
-
+hello world
 ## 🏗️ System Architecture
 
 ```text
